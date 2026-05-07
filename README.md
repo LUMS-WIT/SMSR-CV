@@ -1,4 +1,4 @@
-# SMSR-CV — Thermal Guided Super-Resolution for Real-time SMAP Downscaling (GRSL 2026)
+# SMSR-CV — Thermal Guided Super-Resolution for Real-time SMAP Downscaling
 
 Code repository for:
 
@@ -10,7 +10,7 @@ Code repository for:
 
 ## Dataset availability
 
-The dataset used in this work **will be released upon publication** of the associated GRSL article.
+The dataset used in this work will be released upon publication of the associated IEEE GRSL article.
 
 ---
 
