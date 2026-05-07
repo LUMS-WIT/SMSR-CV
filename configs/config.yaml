@@ -1,0 +1,44 @@
+# configs/config.yaml
+paths:
+  # in_dir: "training/temporal/forward/train/1km-r-m"
+  # coarse_dir: "training/temporal/forward/train/9km"
+  # fine_dir: "training/temporal/forward/train/1km"
+  in_dir: "training/temporal/complete/test/1km-r-m"
+  coarse_dir: "training/temporal/complete/test/9km"
+  fine_dir: "training/temporal/complete/test/1km"
+  save_dir: "checkpoints/temporal/complete"
+  model_path: "best_model_res_t.pth"
+  training_log: "training_log_res_t.json"
+  stats_path: "data_stats_1km_r.json"   # ONLY SAVE FOR TRAIN DATA (used in data normalization)
+
+training:
+  epochs: 1000
+  patience: 50
+  batch_size: 8           # 1 for test and inference
+  val_split: 0.2
+  lr: 1e-3
+  lambda: 1.0
+  weight_decay: 1e-3
+  log: true              # true to log training process
+
+validation:
+  raster_out: 'Output/out_full'
+
+inference:
+  num_samples: 5
+  smooth_for_display: true   # true to apply Gaussian smoothing to the output for better visualization
+  smooth_size: 7
+
+data:
+  smap: true             # legacy; false for SMAP-HB upper bound experiment
+  upsample: false         # true to SRCNN_Shuffle only
+  coarse_res: "9km"
+  fine_res: "1km"
+  scale_factor: 9
+  in_channels: 5        # 1 for single-channel input; 5 for multi-channel input
+
+model:
+  geomodel: false             # True only for GeoTransformerSR
+  arch: "SRCNN_Residual"   # SRCNN_Residual,  SRCNN_Shuffle
+
+device: "cuda"   #"cuda" or "cpu"
