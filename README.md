@@ -73,6 +73,10 @@ python main.py --stage test --config configs/config.yaml
 
 ---
 
+## Contact
+
+- For questions or collaborations, please contact the the authors via [LinkdIn](www.linkedin.com/in/hamza-rafique-ac952) or [email](22060019@lums.edu.pk).
+---
 ## Citation
 
 If you use this code, please cite:
