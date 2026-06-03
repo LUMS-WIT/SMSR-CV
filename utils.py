@@ -890,6 +890,434 @@ def plot_predictions_4x(x_1km_dn, y_9km_dn, pred_dn, y_1km_dn, idx=0,
                         wspace=0.08)
     plt.show()
 
+
+def plot_predictions_4x_new(
+    y_9km_dn,
+    pred_dn,
+    y_1km_dn,
+    lst_dn,
+    idx=0,
+    title="",
+    cmap_sm="Spectral",
+    cmap_lst="inferno",
+    save_path=None,
+    display_dpi=100,
+    save_dpi=300,
+):
+    """
+    4-panel plot:
+
+      1. SMAP 9km
+      2. Predicted 1km
+      3. SMAP 1km
+      4. MODIS LST
+
+    First 3 panels share one common soil-moisture colorbar on the LEFT.
+    LST has its own colorbar on the RIGHT.
+
+    Display stays readable.
+    Saved figure is exported at 300 dpi.
+    """
+
+    img_9km  = y_9km_dn[idx, 0]
+    img_pred = pred_dn[idx, 0]
+    img_1km  = y_1km_dn[idx, 0]
+    img_lst  = lst_dn[idx, 0]
+
+    # Shared soil-moisture color range
+    sm_vals = np.concatenate([
+        img_9km.ravel(),
+        img_pred.ravel(),
+        img_1km.ravel(),
+    ])
+    sm_vmin, sm_vmax = np.nanpercentile(sm_vals, [2, 98])
+
+    # LST color range
+    lst_vmin, lst_vmax = np.nanpercentile(img_lst, [2, 98])
+
+    with plt.rc_context({
+        "font.size": 8,
+        "axes.titlesize": 10,
+        "axes.labelsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "figure.titlesize": 10,
+    }):
+
+        fig, axes = plt.subplots(
+            1, 4,
+            figsize=(12, 3.4),
+            dpi=display_dpi
+        )
+
+        # Tighter / more standard spacing between panels
+        fig.subplots_adjust(
+            left=0.10,
+            right=0.90,
+            bottom=0.14,
+            top=0.80,
+            wspace=0.10
+        )
+
+        # --- Plot first three SM panels ---
+        sm_panels = [
+            (img_9km,  "SMAP SM 9km"),
+            (img_pred, "Predicted SM 1km"),
+            (img_1km,  "SMAP SM 1km"),
+        ]
+
+        for ax, (img, label) in zip(axes[:3], sm_panels):
+            im_sm = ax.imshow(
+                img,
+                cmap=cmap_sm,
+                vmin=sm_vmin,
+                vmax=sm_vmax,
+                interpolation="nearest",
+                aspect="equal"
+            )
+            ax.set_title(label, pad=6)
+            ax.axis("off")
+
+        # --- Plot LST panel ---
+        im_lst = axes[3].imshow(
+            img_lst,
+            cmap=cmap_lst,
+            vmin=lst_vmin,
+            vmax=lst_vmax,
+            interpolation="nearest",
+            aspect="equal"
+        )
+        axes[3].set_title("MODIS LST 1km", pad=6)
+        axes[3].axis("off")
+
+        # ------------------------------------------------------------------
+        # Add colorbars with SMALLER gap from the plots
+        # ------------------------------------------------------------------
+        pos_left  = axes[0].get_position()
+        pos_right = axes[3].get_position()
+
+        cbar_width = 0.012
+        cbar_gap = 0.006   # smaller gap than before
+
+        # Left common colorbar for soil moisture
+        cbar_sm_ax = fig.add_axes([
+            pos_left.x0 - cbar_gap - cbar_width,
+            pos_left.y0,
+            cbar_width,
+            pos_left.height
+        ])
+        cbar_sm = fig.colorbar(im_sm, cax=cbar_sm_ax)
+        cbar_sm.set_label("Soil Moisture (m³/m³)", fontsize=8, labelpad=6)
+        cbar_sm.ax.tick_params(labelsize=8)
+        cbar_sm_ax.yaxis.set_ticks_position("left")
+        cbar_sm_ax.yaxis.set_label_position("left")
+
+        # Right colorbar for LST
+        cbar_lst_ax = fig.add_axes([
+            pos_right.x1 + cbar_gap,
+            pos_right.y0,
+            cbar_width,
+            pos_right.height
+        ])
+        cbar_lst = fig.colorbar(im_lst, cax=cbar_lst_ax)
+        cbar_lst.set_label("LST (K)", fontsize=8, labelpad=6)
+        cbar_lst.ax.tick_params(labelsize=8)
+        cbar_lst_ax.yaxis.set_ticks_position("right")
+        cbar_lst_ax.yaxis.set_label_position("right")
+
+        if title:
+            fig.suptitle(title, fontsize=10, fontweight="bold", y=0.93)
+
+        if save_path is not None:
+            fig.savefig(
+                save_path,
+                dpi=save_dpi,
+                bbox_inches="tight",
+                pad_inches=0.05
+            )
+
+        plt.show()
+
+def plot_predictions_5x(
+    y_9km_dn,
+    pred_dn,
+    y_1km_dn,
+    lst_dn,
+    dem_dn,
+    idx=0,
+    title="Model Prediction",
+    cmap_sm="Spectral",
+    cmap_lst="inferno",
+    cmap_dem="terrain",
+    save_path=None,
+    display_dpi=100,
+    save_dpi=300,
+):
+    """
+    5-panel plot:
+
+      1. SMAP 9km                 Soil moisture, m³/m³
+      2. Predicted 1km            Soil moisture, m³/m³
+      3. SMAP 1km                 Soil moisture, m³/m³
+      4. MODIS LST                Kelvin
+      5. DEM                      meters
+
+    First 3 panels share one common soil-moisture colorbar on the LEFT.
+    LST has its own colorbar.
+    DEM has its own colorbar on the RIGHT.
+
+    Display dpi stays readable.
+    Saved figure is exported at 300 dpi.
+    """
+
+    img_9km  = y_9km_dn[idx, 0]
+    img_pred = pred_dn[idx, 0]
+    img_1km  = y_1km_dn[idx, 0]
+    img_lst  = lst_dn[idx, 0]
+    img_dem  = dem_dn[idx, 0]
+
+    sm_vals = np.concatenate([
+        img_9km.ravel(),
+        img_pred.ravel(),
+        img_1km.ravel(),
+    ])
+
+    sm_vmin, sm_vmax = np.nanpercentile(sm_vals, [2, 98])
+    lst_vmin, lst_vmax = np.nanpercentile(img_lst, [2, 98])
+    dem_vmin, dem_vmax = np.nanpercentile(img_dem, [2, 98])
+
+    with plt.rc_context({
+        "font.size": 8,
+        "axes.titlesize": 10,
+        "axes.labelsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "figure.titlesize": 10,
+    }):
+
+        fig = plt.figure(figsize=(14.5, 3.4), dpi=display_dpi)
+
+        bottom = 0.18
+        height = 0.58
+
+        img_w = 0.135
+        gap = 0.025
+        cbar_w = 0.010
+
+        x_start = 0.085
+
+        ax1 = fig.add_axes([x_start + 0 * (img_w + gap), bottom, img_w, height])
+        ax2 = fig.add_axes([x_start + 1 * (img_w + gap), bottom, img_w, height])
+        ax3 = fig.add_axes([x_start + 2 * (img_w + gap), bottom, img_w, height])
+        ax4 = fig.add_axes([x_start + 3 * (img_w + gap), bottom, img_w, height])
+
+        # LST colorbar between LST and DEM
+        cbar_lst_ax = fig.add_axes([
+            x_start + 4 * (img_w + gap) - 0.015,
+            bottom,
+            cbar_w,
+            height
+        ])
+
+        ax5 = fig.add_axes([
+            x_start + 4 * (img_w + gap) + 0.010,
+            bottom,
+            img_w,
+            height
+        ])
+
+        # Soil moisture colorbar on far left
+        cbar_sm_ax = fig.add_axes([0.040, bottom, cbar_w, height])
+
+        # DEM colorbar on far right
+        cbar_dem_ax = fig.add_axes([0.940, bottom, cbar_w, height])
+
+        sm_panels = [
+            (ax1, img_9km,  "SMAP 9km"),
+            (ax2, img_pred, "Predicted 1km"),
+            (ax3, img_1km,  "SMAP 1km"),
+        ]
+
+        for ax, img, label in sm_panels:
+            im_sm = ax.imshow(
+                img,
+                cmap=cmap_sm,
+                vmin=sm_vmin,
+                vmax=sm_vmax,
+                interpolation="nearest",
+                aspect="equal",
+            )
+            ax.set_title(label, fontsize=10, pad=6)
+            ax.axis("off")
+
+        im_lst = ax4.imshow(
+            img_lst,
+            cmap=cmap_lst,
+            vmin=lst_vmin,
+            vmax=lst_vmax,
+            interpolation="nearest",
+            aspect="equal",
+        )
+        ax4.set_title("MODIS LST", fontsize=10, pad=6)
+        ax4.axis("off")
+
+        im_dem = ax5.imshow(
+            img_dem,
+            cmap=cmap_dem,
+            vmin=dem_vmin,
+            vmax=dem_vmax,
+            interpolation="nearest",
+            aspect="equal",
+        )
+        ax5.set_title("DEM", fontsize=10, pad=6)
+        ax5.axis("off")
+
+        # Common soil moisture colorbar
+        cbar_sm = fig.colorbar(im_sm, cax=cbar_sm_ax)
+        cbar_sm.set_label("Soil Moisture (m³/m³)", fontsize=8, labelpad=6)
+        cbar_sm.ax.tick_params(labelsize=8)
+        cbar_sm_ax.yaxis.set_ticks_position("left")
+        cbar_sm_ax.yaxis.set_label_position("left")
+
+        # LST colorbar
+        cbar_lst = fig.colorbar(im_lst, cax=cbar_lst_ax)
+        cbar_lst.set_label("LST (K)", fontsize=8, labelpad=6)
+        cbar_lst.ax.tick_params(labelsize=8)
+
+        # DEM colorbar
+        cbar_dem = fig.colorbar(im_dem, cax=cbar_dem_ax)
+        cbar_dem.set_label("Elevation (m)", fontsize=8, labelpad=6)
+        cbar_dem.ax.tick_params(labelsize=8)
+        cbar_dem_ax.yaxis.set_ticks_position("right")
+        cbar_dem_ax.yaxis.set_label_position("right")
+
+        if title:
+            fig.suptitle(
+                title,
+                fontsize=10,
+                fontweight="bold",
+                y=0.96,
+            )
+
+        if save_path is not None:
+            fig.savefig(
+                save_path,
+                dpi=save_dpi,
+                bbox_inches="tight",
+                pad_inches=0.08,
+            )
+
+        plt.show()
+
+def plot_predictions_6x(
+    x_1km_dn, y_9km_dn, pred_dn, y_1km_dn,
+    lst_dn, dem_dn,
+    idx=0,
+    title="Model Prediction",
+    cmap_sm="Spectral",
+    cmap_lst="inferno",
+    cmap_dem="terrain"
+):
+    """
+    Plot 6 panels:
+
+      1. Coarse Resolution Input 9km      Soil moisture, m³/m³
+      2. Coarse Interpolated 1km-R        Soil moisture, m³/m³
+      3. Predicted 1km                    Soil moisture, m³/m³
+      4. High Resolution Reference 1km    Soil moisture, m³/m³
+      5. MODIS LST                        Kelvin
+      6. DEM                              meters
+
+    First 4 panels share one soil-moisture colorbar on the left.
+    LST and DEM each have their own colorbar on the left of their panel.
+    """
+
+    img_9km  = y_9km_dn[idx, 0]
+    img_1kr  = x_1km_dn[idx, 0]
+    img_pred = pred_dn[idx, 0]
+    img_1km  = y_1km_dn[idx, 0]
+    img_lst  = lst_dn[idx, 0]
+    img_dem  = dem_dn[idx, 0]
+
+    sm_vals = np.concatenate([
+        img_9km.ravel(),
+        img_1kr.ravel(),
+        img_pred.ravel(),
+        img_1km.ravel()
+    ])
+
+    sm_vmin, sm_vmax = np.nanpercentile(sm_vals, [2, 98])
+    lst_vmin, lst_vmax = np.nanpercentile(img_lst, [2, 98])
+    dem_vmin, dem_vmax = np.nanpercentile(img_dem, [2, 98])
+
+    fig, axes = plt.subplots(1, 6, figsize=(28, 5))
+
+    sm_panels = [
+        (img_9km,  "Coarse Resolution Input (9km)"),
+        (img_1kr,  "Coarse Interpolated (1km-R)"),
+        (img_pred, "Predicted (1km)"),
+        (img_1km,  "High Resolution Reference (1km)")
+    ]
+
+    for ax, (img, label) in zip(axes[:4], sm_panels):
+        im_sm = ax.imshow(
+            img,
+            cmap=cmap_sm,
+            vmin=sm_vmin,
+            vmax=sm_vmax,
+            interpolation="nearest"
+        )
+        ax.set_title(label, fontsize=11)
+        ax.axis("off")
+
+    im_lst = axes[4].imshow(
+        img_lst,
+        cmap=cmap_lst,
+        vmin=lst_vmin,
+        vmax=lst_vmax,
+        interpolation="nearest"
+    )
+    axes[4].set_title("MODIS LST (K)", fontsize=11)
+    axes[4].axis("off")
+
+    im_dem = axes[5].imshow(
+        img_dem,
+        cmap=cmap_dem,
+        vmin=dem_vmin,
+        vmax=dem_vmax,
+        interpolation="nearest"
+    )
+    axes[5].set_title("DEM (m)", fontsize=11)
+    axes[5].axis("off")
+
+    fig.subplots_adjust(
+        top=0.85,
+        bottom=0.05,
+        left=0.08,
+        right=0.98,
+        wspace=0.12
+    )
+
+    # Shared soil moisture colorbar on the far left
+    cbar_sm_ax = fig.add_axes([0.025, 0.18, 0.012, 0.58])
+    cbar_sm = fig.colorbar(im_sm, cax=cbar_sm_ax)
+    cbar_sm.set_label("Soil Moisture (m³/m³)", fontsize=11)
+    cbar_sm_ax.yaxis.set_ticks_position("left")
+    cbar_sm_ax.yaxis.set_label_position("left")
+
+    # LST colorbar on left side of LST panel
+    cbar_lst = fig.colorbar(im_lst, ax=axes[4], fraction=0.046, pad=0.04)
+    cbar_lst.set_label("LST (K)", fontsize=11)
+
+    # DEM colorbar on left side of DEM panel
+    cbar_dem = fig.colorbar(im_dem, ax=axes[5], fraction=0.046, pad=0.04)
+    cbar_dem.set_label("Elevation (m)", fontsize=11)
+
+    if title:
+        fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
+
+    plt.show()
+
 ########################################################################################
 ## Metrics
 ########################################################################################

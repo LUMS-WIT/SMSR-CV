@@ -11,7 +11,7 @@ from scipy.ndimage import uniform_filter
 
 from utils import SRCvDataset
 from model import SRCNN_Shuffle, SRCNN_Residual
-from utils import plot_predictions, plot_predictions_4x
+from utils import plot_predictions, plot_predictions_4x, plot_predictions_6x, plot_predictions_4x_new, plot_predictions_5x
 
 
 def focal_mean_nan(arr, size=7):
@@ -135,6 +135,12 @@ def run(cfg, device):
     x1_b1_mean = stats["x1"]["band_1"]["mean"]
     x1_b1_std = stats["x1"]["band_1"]["std"]
 
+    x1_b2_mean = stats["x1"]["band_2"]["mean"]
+    x1_b2_std = stats["x1"]["band_2"]["std"]
+
+    x1_b3_mean = stats["x1"]["band_3"]["mean"]
+    x1_b3_std = stats["x1"]["band_3"]["std"]
+
     y1_mean = stats["y1"]["band_1"]["mean"]
     y1_std = stats["y1"]["band_1"]["std"]
 
@@ -182,6 +188,15 @@ def run(cfg, device):
                 x_1km[:, 0:1].cpu().numpy() * x1_b1_std + x1_b1_mean
             )
 
+            # Band 1 of x_1km = Modis LST
+            x1_band1_dn = (
+                x_1km[:, 1:2].cpu().numpy() * x1_b2_std + x1_b2_mean
+            )
+
+            x1_band2_dn = (
+                x_1km[:, 2:3].cpu().numpy() * x1_b3_std + x1_b3_mean
+            )
+
             pred_dn = (
                 pred_1km.cpu().numpy() * y1_std + y1_mean
             )
@@ -206,11 +221,15 @@ def run(cfg, device):
                 # Usually keep original 9 km SMAP unchanged,
                 # because it is already coarse.
                 y9_plot = y_9km_dn
+                x2_plot = x1_band1_dn
+                x3_plot = x1_band2_dn
 
                 smoothing_note = f"{smooth_size}x{smooth_size} focal mean for visualization"
 
             else:
                 x1_plot = x1_band0_dn
+                x2_plot = x1_band1_dn
+                x3_plot = x1_band2_dn
                 pred_plot = pred_dn
                 y1_plot = y_1km_dn
                 y9_plot = y_9km_dn
@@ -225,14 +244,46 @@ def run(cfg, device):
             # ─────────────────────────────
             # Plot
             # ─────────────────────────────
-            plot_predictions_4x(
-                x_1km_dn=x1_plot,
+            # plot_predictions_4x(
+            #     x_1km_dn=x1_plot,
+            #     y_9km_dn=y9_plot,
+            #     pred_dn=pred_plot,
+            #     y_1km_dn=y1_plot,
+            #     idx=0,
+            #     title=f"Sample #{idx} | Date: {date_label} | {smoothing_note}",
+            # )
+
+            plot_predictions_4x_new(
                 y_9km_dn=y9_plot,
                 pred_dn=pred_plot,
                 y_1km_dn=y1_plot,
+                lst_dn=x2_plot,
                 idx=0,
-                title=f"Sample #{idx} | Date: {date_label} | {smoothing_note}",
+                # title=f"Date: {date_label}",
+                save_path=f"Output\\results\\sample_{idx}_4x.png",
             )
+
+            # plot_predictions_5x(
+            #     y_9km_dn=y9_plot,      # SMAP 9km
+            #     pred_dn=pred_plot,     # Predicted 1km
+            #     y_1km_dn=y1_plot,      # SMAP 1km
+            #     lst_dn=x2_plot,        # MODIS LST
+            #     dem_dn=x3_plot,        # DEM
+            #     idx=0,
+            #     title=f"Sample #{idx} | Date: {date_label} | {smoothing_note}",
+            #     save_path=f"sample_{idx}_5x.png",
+            # )
+
+            # plot_predictions_6x(
+            #     x_1km_dn=x1_plot,
+            #     y_9km_dn=y9_plot,
+            #     pred_dn=pred_plot,
+            #     y_1km_dn=y1_plot,
+            #     lst_dn=x2_plot,
+            #     dem_dn=x3_plot,
+            #     idx=0,
+            #     title=f"Sample #{idx} | Date: {date_label} | {smoothing_note}",
+            # )
 
             if idx >= num_samples - 1:
                 break
