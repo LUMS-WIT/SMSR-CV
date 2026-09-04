@@ -294,6 +294,79 @@ class SRCvDataset(Dataset):
 
         return x_1km, y_1km, y_9km, center_lon, center_lat, date, 'this is a placeholder'
 
+
+class SRUsDataset(SRCvDataset):
+    """
+    Prediction-only super-resolution dataset.
+
+    Inputs:
+      - 1 km R-M multiband raster
+      - 9 km SMAP raster
+
+    Does not use 1 km SMAP target rasters.
+    """
+
+    def __init__(
+        self,
+        in_dir,
+        coarse_dir,
+        coarse_res="9km",
+        fine_res="1km",
+        scale_factor=9,
+        stats_path=None,
+        transform=None
+    ):
+        # fine_dir is intentionally not used for prediction
+        super().__init__(
+            in_dir=in_dir,
+            coarse_dir=coarse_dir,
+            fine_dir=None,
+            coarse_res=coarse_res,
+            fine_res=fine_res,
+            scale_factor=scale_factor,
+            stats_path=stats_path,
+            transform=transform
+        )
+
+    def __getitem__(self, idx):
+
+        # 9 km SMAP file
+        f9 = self.files[idx]
+
+        # Example: SMAP-E_9km_AM_20150403_0.tif --> 20150403_0
+        key = re.search(r"(\d{8}_\d+)", os.path.basename(f9)).group(1)
+
+        date_str = key.split("_")[0]
+        date = torch.tensor(int(date_str), dtype=torch.int32)
+
+        # 1 km R-M multiband input
+        f_1km_rm = os.path.join(
+            self.in_dir,
+            f"SMAP-E_1km_AM_{key}.tif"
+        )
+
+        # Read only 1 km multiband input and 9 km SMAP
+        x_1km, _, _ = self._read(f_1km_rm)
+        y_9km, center_lon, center_lat = self._read(f9, geoloc=True)
+
+        # NaN handling
+        x_1km = self.fill_nan(x_1km)
+        y_9km = self.fill_nan(y_9km)
+
+        # Normalization
+        x_1km = self.normalize_multiband(x_1km, self.stats["x1"])
+
+        y9_mean = np.float32(self.stats["y9"]["band_1"]["mean"])
+        y9_std = np.float32(self.stats["y9"]["band_1"]["std"])
+        y_9km = (y_9km - y9_mean) / (y9_std + 1e-6)
+
+        # Convert to PyTorch tensors
+        x_1km = torch.from_numpy(x_1km).float()
+        y_9km = torch.from_numpy(y_9km).float()
+
+        return x_1km, y_9km, center_lon, center_lat, date, "this is a placeholder"
+
+
 class SREncDataset(Dataset):
     def __init__(self, coarse_dir, fine_dir, coarse_res = "9km", fine_res="1km", scale_factor=9, 
                  in_channels=1, stats_path=None, upsample= True, legacy=False, SMAP=True, transform=None):
@@ -1346,3 +1419,156 @@ def calculate_dataset_stats_cv(
 
 # print("Dataset statistics saved to", stats)
 # print("Number of FR1 bands:", fr1_bands)
+
+
+def calculate_dataset_stats_uscrn(
+    x1_dir,
+    y9_dir,
+    x1_bands=5,
+    json_path="prediction_dataset_stats.json",
+    trained_stats_path=None,
+):
+    """
+    Calculate statistics without 1 km SMAP proxy rasters.
+
+    Inputs:
+      - x1_dir: 1 km R-M multiband input TIFF folder
+      - y9_dir: 9 km SMAP TIFF folder
+      - trained_stats_path: original training stats JSON, used to retain y1 stats
+    """
+
+    stats = {
+        "x1": {},
+        "y9": {},
+    }
+
+    # Keep target-normalization statistics from the training dataset.
+    # Required by the prediction script to denormalize model output.
+    if trained_stats_path is not None:
+        with open(trained_stats_path, "r") as f:
+            trained_stats = json.load(f)
+
+        if "y1" not in trained_stats:
+            raise KeyError("The training statistics file does not contain 'y1'.")
+
+        stats["y1"] = trained_stats["y1"]
+
+    def init_accumulator(n_bands):
+        return (
+            np.zeros(n_bands, dtype=np.float64),
+            np.zeros(n_bands, dtype=np.float64),
+            np.zeros(n_bands, dtype=np.int64),
+        )
+
+    x1_sum, x1_sq, x1_count = init_accumulator(x1_bands)
+    y9_sum, y9_sq, y9_count = init_accumulator(1)
+
+    # Last two multiband layers are categorical.
+    categorical_classes = {
+        x1_bands - 1: set(),
+        x1_bands: set(),
+    }
+
+    # -----------------------------
+    # Process 1 km R-M multiband inputs
+    # -----------------------------
+    x1_files = glob.glob(os.path.join(x1_dir, "*.tif"))
+
+    for file_path in tqdm(x1_files, desc="Processing 1 km R-M inputs"):
+        with rasterio.open(file_path) as src:
+            for i in range(x1_bands):
+                band = src.read(i + 1).astype(np.float64)
+                band = band[~np.isnan(band)]
+
+                if band.size == 0:
+                    continue
+
+                band_idx = i + 1
+
+                if band_idx in categorical_classes:
+                    categorical_classes[band_idx].update(
+                        np.unique(band.astype(np.int32))
+                    )
+                else:
+                    x1_sum[i] += band.sum()
+                    x1_sq[i] += np.square(band).sum()
+                    x1_count[i] += band.size
+
+    # -----------------------------
+    # Process 9 km SMAP rasters
+    # -----------------------------
+    y9_files = glob.glob(os.path.join(y9_dir, "*.tif"))
+
+    for file_path in tqdm(y9_files, desc="Processing 9 km SMAP"):
+        with rasterio.open(file_path) as src:
+            band = src.read(1).astype(np.float64)
+            band = band[~np.isnan(band)]
+
+            if band.size == 0:
+                continue
+
+            y9_sum[0] += band.sum()
+            y9_sq[0] += np.square(band).sum()
+            y9_count[0] += band.size
+
+    # -----------------------------
+    # Finalize 1 km input statistics
+    # -----------------------------
+    input_channels_after_encoding = 0
+
+    for i in range(x1_bands):
+        band_idx = i + 1
+
+        if band_idx in categorical_classes:
+            classes = sorted(map(int, categorical_classes[band_idx]))
+            mapping = {class_value: index for index, class_value in enumerate(classes)}
+
+            stats["x1"][f"band_{band_idx}"] = {
+                "type": "categorical",
+                "num_classes": len(classes),
+                "classes": classes,
+                "mapping": mapping,
+            }
+            input_channels_after_encoding += len(classes)
+
+        else:
+            if x1_count[i] == 0:
+                raise ValueError(f"No valid pixels found in x1 band {band_idx}.")
+
+            mean = x1_sum[i] / x1_count[i]
+            std = np.sqrt(x1_sq[i] / x1_count[i] - mean ** 2)
+
+            stats["x1"][f"band_{band_idx}"] = {
+                "type": "continuous",
+                "mean": float(mean),
+                "std": float(std),
+            }
+            input_channels_after_encoding += 1
+
+    # -----------------------------
+    # Finalize 9 km SMAP statistics
+    # -----------------------------
+    if y9_count[0] == 0:
+        raise ValueError("No valid pixels found in 9 km SMAP rasters.")
+
+    y9_mean = y9_sum[0] / y9_count[0]
+    y9_std = np.sqrt(y9_sq[0] / y9_count[0] - y9_mean ** 2)
+
+    stats["y9"]["band_1"] = {
+        "type": "continuous",
+        "mean": float(y9_mean),
+        "std": float(y9_std),
+    }
+
+    if json_path:
+        with open(json_path, "w") as f:
+            json.dump(stats, f, indent=2)
+
+    return stats, input_channels_after_encoding
+
+# stats, in_channels = calculate_dataset_stats_uscrn(
+#     x1_dir=r"training/temporal/uscrn/test/1km-r-m",
+#     y9_dir=r"training/temporal/uscrn/test/9km",
+#     trained_stats_path=r"checkpoints/temporal/complete/data_stats_1km_r.json",
+#     json_path=r"checkpoints/temporal/complete/data_stats_1km_uscrn.json",
+# )

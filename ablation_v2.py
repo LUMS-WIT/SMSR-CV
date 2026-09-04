@@ -200,26 +200,26 @@ def plot_metric(all_results, severity_levels, metric_key, ylabel, save_dir):
     ))
     ax.minorticks_off()
 
-    ax.set_xlabel("Noise Standard Deviation (σ)", fontsize=13, color="black")
-    ax.tick_params(axis="x", labelcolor="black", labelsize=11)
+    ax.set_xlabel("Noise Standard Deviation (σ)", fontsize=14, color="black")
+    ax.tick_params(axis="x", labelcolor="black", labelsize=12)
 
     # ── Secondary x-axis: Class Perturbation Rate ──
     ax2 = ax.twiny()
     ax2.set_xscale("log")
     ax2.set_xlim(ax.get_xlim())
     ax2.set_xticks(x_values)
-    ax2.set_xticklabels([f"{int(round(p))}" for p in flip_percentages], fontsize=10)
+    ax2.set_xticklabels([f"{int(round(p))}" for p in flip_percentages], fontsize=12)
     ax2.minorticks_off()
 
     ax2.xaxis.set_ticks_position("bottom")
     ax2.xaxis.set_label_position("bottom")
     ax2.spines["bottom"].set_position(("outward", 40))
-    ax2.set_xlabel("Class Perturbation Rate (%)", fontsize=13, color="black")
-    ax2.tick_params(axis="x", labelcolor="black", labelsize=10)
+    ax2.set_xlabel("Class Perturbation Rate (%)", fontsize=14, color="black")
+    ax2.tick_params(axis="x", labelcolor="black", labelsize=12)
 
     # ── y-axis ──
-    ax.set_ylabel(ylabel, fontsize=13, color="black")
-    ax.tick_params(axis="y", labelcolor="black", labelsize=11)
+    ax.set_ylabel(ylabel, fontsize=14, color="black")
+    ax.tick_params(axis="y", labelcolor="black", labelsize=12)
 
     # ── Title ──
     ax.set_title(
@@ -232,7 +232,7 @@ def plot_metric(all_results, severity_levels, metric_key, ylabel, save_dir):
     ax.legend(
         all_lines, all_labels,
         loc="best",
-        fontsize=10,
+        fontsize=12,
         framealpha=0.9,
     )
 

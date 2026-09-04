@@ -3,13 +3,16 @@ paths:
   # in_dir: "training/temporal/forward/train/1km-r-m"
   # coarse_dir: "training/temporal/forward/train/9km"
   # fine_dir: "training/temporal/forward/train/1km"
-  in_dir: "training/temporal/complete/test/1km-r-m"
-  coarse_dir: "training/temporal/complete/test/9km"
-  fine_dir: "training/temporal/complete/test/1km"
+  in_dir: "training/temporal/uscrn/test/1km-r-m"
+  coarse_dir: "training/temporal/uscrn/test/9km"
+  # in_dir: "training/temporal/complete/test/1km-r-m"
+  # coarse_dir: "training/temporal/complete/test/9km"
+  # fine_dir: "training/temporal/complete/test/1km"
   save_dir: "checkpoints/temporal/complete"
   model_path: "best_model_res_t.pth"
   training_log: "training_log_res_t.json"
-  stats_path: "data_stats_1km_r.json"   # ONLY SAVE FOR TRAIN DATA (used in data normalization)
+  # stats_path: "data_stats_1km_r.json"   # ONLY SAVE FOR TRAIN DATA (used in data normalization)
+  stats_path: "data_stats_1km_uscrn.json"
 
 training:
   epochs: 1000
@@ -22,7 +25,7 @@ training:
   log: true              # true to log training process
 
 validation:
-  raster_out: 'Output/out_full'
+  raster_out: 'Output/out_full_uscrn'
 
 inference:
   num_samples: 5
